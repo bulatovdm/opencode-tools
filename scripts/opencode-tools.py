@@ -13,9 +13,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import balance as bl  # noqa: E402
 import worktime as wt  # noqa: E402
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 
 def print_time(value: dict, label: str = "работа агента") -> None:
@@ -166,6 +167,16 @@ def cmd_watch(args) -> int:
         return 0
 
 
+def cmd_balance(args) -> int:
+    auth = bl.read_auth()
+    values = bl.fetch_balances(auth, args.provider, args.timeout)
+    if args.json:
+        print(wt.dump({"providers": values}))
+    else:
+        bl.print_balance(values)
+    return 0
+
+
 def cmd_stats(args) -> int:
     conn = wt.connect()
     today = date.today()
@@ -240,6 +251,15 @@ def build_parser() -> argparse.ArgumentParser:
     watch_parser.add_argument("--interval", type=float, default=1.0,
                               help="обновление в секундах (по умолчанию 1)")
     watch_parser.set_defaults(func=cmd_watch)
+
+    balance_parser = sub.add_parser(
+        "balance", help="остаток на балансе провайдера")
+    balance_parser.add_argument("--provider", metavar="ID",
+                                help="провайдер (по умолчанию: все подключённые)")
+    balance_parser.add_argument("--timeout", type=float, default=bl.DEFAULT_TIMEOUT,
+                                help="таймаут запроса в секундах (по умолчанию 10)")
+    balance_parser.add_argument("--json", action="store_true")
+    balance_parser.set_defaults(func=cmd_balance)
 
     stats_parser = sub.add_parser(
         "stats", help="заходы, промпты, шаги, время и стоимость за период")

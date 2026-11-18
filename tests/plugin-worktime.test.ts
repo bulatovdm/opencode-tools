@@ -1,11 +1,17 @@
 import { describe, expect, test } from "bun:test"
 
-import { collect, formatDuration, label, unionSeconds } from "../plugin/worktime"
+import {
+  collect,
+  formatDuration,
+  formatMoney,
+  label,
+  unionSeconds,
+} from "../plugin/worktime"
 
 const s = (value: number) => value * 1000
 
-function assistant(created: number, completed?: number) {
-  return { type: "assistant", time: { created, completed } }
+function assistant(created: number, completed?: number, cost = 0) {
+  return { type: "assistant", cost, time: { created, completed } }
 }
 
 function user(created: number) {
@@ -53,6 +59,14 @@ describe("collect", () => {
   test("empty input", () => {
     expect(collect([], s(10)).seconds).toBe(0)
   })
+
+  test("sums the cost of assistant steps", () => {
+    const summary = collect(
+      [assistant(s(100), s(110), 0.2), assistant(s(120), s(130), 0.05)],
+      s(1000),
+    )
+    expect(summary.cost).toBeCloseTo(0.25)
+  })
 })
 
 describe("unionSeconds", () => {
@@ -63,13 +77,27 @@ describe("unionSeconds", () => {
 
 describe("label", () => {
   test("shows work and the current turn while running", () => {
-    const summary = { seconds: 4320, live: true, lastUser: s(100) }
+    const summary = { seconds: 4320, live: true, lastUser: s(100), cost: 0 }
     expect(label(summary, true, s(280))).toBe("Работа: 1ч 12м · ход: 3м")
   })
 
   test("hides the turn while idle", () => {
-    const summary = { seconds: 60, live: false, lastUser: 0 }
+    const summary = { seconds: 60, live: false, lastUser: 0, cost: 0 }
     expect(label(summary, false, s(1000))).toBe("Работа: 1м")
+  })
+
+  test("adds spent money and provider balance", () => {
+    const summary = { seconds: 60, live: false, lastUser: 0, cost: 0.42 }
+    expect(label(summary, false, s(1000), "DeepSeek: $10.14"))
+      .toBe("Работа: 1м · потрачено $0.4200 · баланс DeepSeek: $10.14")
+  })
+})
+
+describe("formatMoney", () => {
+  test("keeps more digits for small amounts", () => {
+    expect(formatMoney(12.3)).toBe("$12.30")
+    expect(formatMoney(1.23)).toBe("$1.230")
+    expect(formatMoney(0.42)).toBe("$0.4200")
   })
 })
 

@@ -24,7 +24,7 @@ def run_tests(source: Path) -> None:
     bun = shutil.which("bun")
     if bun:
         subprocess.run(
-            [bun, "test", str(source / "tests" / "plugin-worktime.test.ts")],
+            [bun, "test", str(source / "tests")],
             check=True,
         )
 
@@ -117,9 +117,11 @@ def main() -> int:
     print()
     print("  opencode-tools time            # работа последней сессии")
     print("  opencode-tools stats --days 7  # заходы, шаги, время, стоимость")
+    print("  opencode-tools balance         # остаток на балансе")
     print("  opencode-tools watch           # живая строка")
     print()
-    print("Строка «Работа: …» появится в футере после /reload или перезапуска TUI.")
+    print("Строка «Работа: … · баланс DeepSeek: …» появится в футере "
+          "после /reload или перезапуска TUI.")
     return 0
 
 

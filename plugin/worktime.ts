@@ -11,11 +11,13 @@ export type Summary = {
   seconds: number
   live: boolean
   lastUser: number
+  cost: number
 }
 
 type Message = {
   type?: string
   role?: string
+  cost?: number
   time?: {
     created?: number
     completed?: number
@@ -26,6 +28,7 @@ export function collect(messages: readonly Message[], now: number): Summary {
   const intervals: Interval[] = []
   let lastUser = 0
   let live = false
+  let cost = 0
 
   for (const message of messages) {
     const type = message.type ?? message.role
@@ -35,6 +38,7 @@ export function collect(messages: readonly Message[], now: number): Summary {
       continue
     }
     if (type !== "assistant") continue
+    if (typeof message.cost === "number" && message.cost > 0) cost += message.cost
     if (typeof created !== "number" || created <= 0) continue
 
     const completed = message.time?.completed
@@ -50,7 +54,7 @@ export function collect(messages: readonly Message[], now: number): Summary {
     intervals.push([created, end])
   }
 
-  return { seconds: unionSeconds(intervals), live, lastUser }
+  return { seconds: unionSeconds(intervals), live, lastUser, cost }
 }
 
 export function unionSeconds(intervals: readonly Interval[]): number {
@@ -84,10 +88,23 @@ export function formatDuration(seconds: number): string {
   return `${Math.floor(minutes / 60)}ч ${String(minutes % 60).padStart(2, "0")}м`
 }
 
-export function label(summary: Summary, running: boolean, now: number): string {
+export function formatMoney(value: number): string {
+  if (value >= 10) return `$${value.toFixed(2)}`
+  if (value >= 1) return `$${value.toFixed(3)}`
+  return `$${value.toFixed(4)}`
+}
+
+export function label(
+  summary: Summary,
+  running: boolean,
+  now: number,
+  balance?: string | null,
+): string {
   const parts = [`Работа: ${formatDuration(summary.seconds)}`]
   if (running && summary.lastUser > 0) {
     parts.push(`ход: ${formatDuration((now - summary.lastUser) / 1000)}`)
   }
+  if (summary.cost > 0) parts.push(`потрачено ${formatMoney(summary.cost)}`)
+  if (balance) parts.push(`баланс ${balance}`)
   return parts.join(" · ")
 }
