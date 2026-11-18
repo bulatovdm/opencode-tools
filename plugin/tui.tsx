@@ -7,7 +7,7 @@
 import { Plugin } from "@opencode/plugin/tui"
 
 import { deepseekBalanceLabel } from "./balance"
-import { collect, label } from "./worktime"
+import { collect, label, tokensLabel } from "./worktime"
 
 export default Plugin.define({
   id: "opencode-tools.worktime",
@@ -73,11 +73,15 @@ export default Plugin.define({
           const summary = collect(messages, clock.now)
           const running = context.data.session.status(sessionID) === "running"
           const provider = context.ui.model.current()?.providerID
+          const tokens = tokensLabel(summary)
           return (
-            <text fg={context.theme.text.base}>
-              {label(summary, running, clock.now,
-                     provider === "deepseek" ? balance.text : "")}
-            </text>
+            <box flexDirection="column">
+              <text fg={context.theme.text.base}>
+                {label(summary, running, clock.now,
+                       provider === "deepseek" ? balance.text : "")}
+              </text>
+              {tokens ? <text fg={context.theme.text.muted}>{tokens}</text> : null}
+            </box>
           )
         } catch {
           return <text> </text>

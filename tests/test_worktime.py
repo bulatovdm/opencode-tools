@@ -46,7 +46,7 @@ class Fixture(unittest.TestCase):
              cost, 0, 0, 0))
 
     def assistant(self, session_id, created, completed=None, cost=0.0,
-                  tools=()):
+                  tools=(), tokens=None):
         content = [{"type": "tool", "name": name} for name in tools]
         data = {
             "role": "assistant",
@@ -54,6 +54,8 @@ class Fixture(unittest.TestCase):
             "cost": cost,
             "content": content,
         }
+        if tokens is not None:
+            data["tokens"] = tokens
         self.db.execute(
             "insert into session_message values (?,?,?,?,?,?,?)",
             (f"msg_{session_id}_{created}", session_id, "assistant", created,
@@ -144,6 +146,38 @@ class WorkTimeTests(Fixture):
         self.assertEqual(value["subagents"], 1)
         self.assertEqual(value["steps"], 1)
         self.assertEqual(value["tools"], 2)
+
+    def test_tokens_roll_up_and_speed_uses_work_time(self):
+        self.session(ROOT)
+        self.session(CHILD, parent=ROOT)
+        self.assistant(ROOT, s(100), s(110), tokens={
+            "input": 100, "output": 20, "reasoning": 30,
+            "cache": {"read": 1000, "write": 5},
+        })
+        self.assistant(CHILD, s(100), s(110), tokens={
+            "input": 50, "output": 10, "reasoning": 5,
+            "cache": {"read": 500, "write": 0},
+        })
+        self.store()
+        value = wt.session_work_time(self.db, ROOT, now_ms=s(1000))
+        tokens = value["tokens"]
+        self.assertEqual(tokens["input"], 150)
+        self.assertEqual(tokens["cache_read"], 1500)
+        self.assertEqual(tokens["cache_write"], 5)
+        self.assertEqual(tokens["output"], 30)
+        self.assertEqual(tokens["reasoning"], 35)
+        self.assertEqual(tokens["total"], 1720)
+        self.assertEqual(tokens["generated"], 65)
+        self.assertAlmostEqual(value["tokens_per_second"], 6.5)
+
+    def test_compact_token_format_truncates(self):
+        self.assertEqual(wt.fmt_tokens(999), "999")
+        self.assertEqual(wt.fmt_tokens(1000), "1k")
+        self.assertEqual(wt.fmt_tokens(1500), "1,5k")
+        self.assertEqual(wt.fmt_tokens(46_107_776), "46,1M")
+        self.assertEqual(wt.fmt_tokens(2_000_000_000), "2B")
+        self.assertEqual(wt.fmt_rate({"generated": 65}, 10), "6,5 ток/с")
+        self.assertEqual(wt.fmt_rate({"generated": 0}, 0), "—")
 
 
 class StatsTests(Fixture):

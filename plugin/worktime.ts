@@ -7,25 +7,56 @@ export type Interval = [number, number]
 export const MAX_STEP_MS = 30 * 60 * 1000
 export const LIVE_WINDOW_MS = 15 * 60 * 1000
 
+export type Tokens = {
+  input: number
+  cacheRead: number
+  cacheWrite: number
+  output: number
+  reasoning: number
+}
+
 export type Summary = {
   seconds: number
   live: boolean
   lastUser: number
   cost: number
+  tokens: Tokens
 }
 
 type Message = {
   type?: string
   role?: string
   cost?: number
+  tokens?: {
+    input?: number
+    output?: number
+    reasoning?: number
+    cache?: {
+      read?: number
+      write?: number
+    }
+  }
   time?: {
     created?: number
     completed?: number
   }
 }
 
+function count(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : 0
+}
+
 export function collect(messages: readonly Message[], now: number): Summary {
   const intervals: Interval[] = []
+  const tokens: Tokens = {
+    input: 0,
+    cacheRead: 0,
+    cacheWrite: 0,
+    output: 0,
+    reasoning: 0,
+  }
   let lastUser = 0
   let live = false
   let cost = 0
@@ -39,6 +70,11 @@ export function collect(messages: readonly Message[], now: number): Summary {
     }
     if (type !== "assistant") continue
     if (typeof message.cost === "number" && message.cost > 0) cost += message.cost
+    tokens.input += count(message.tokens?.input)
+    tokens.cacheRead += count(message.tokens?.cache?.read)
+    tokens.cacheWrite += count(message.tokens?.cache?.write)
+    tokens.output += count(message.tokens?.output)
+    tokens.reasoning += count(message.tokens?.reasoning)
     if (typeof created !== "number" || created <= 0) continue
 
     const completed = message.time?.completed
@@ -54,7 +90,7 @@ export function collect(messages: readonly Message[], now: number): Summary {
     intervals.push([created, end])
   }
 
-  return { seconds: unionSeconds(intervals), live, lastUser, cost }
+  return { seconds: unionSeconds(intervals), live, lastUser, cost, tokens }
 }
 
 export function unionSeconds(intervals: readonly Interval[]): number {
@@ -92,6 +128,51 @@ export function formatMoney(value: number): string {
   if (value >= 10) return `$${value.toFixed(2)}`
   if (value >= 1) return `$${value.toFixed(3)}`
   return `$${value.toFixed(4)}`
+}
+
+export function compactTokens(value: number): string {
+  for (const [threshold, suffix] of [
+    [1_000_000_000, "B"],
+    [1_000_000, "M"],
+    [1_000, "k"],
+  ] as const) {
+    if (value >= threshold) {
+      const count = Math.floor((value / threshold) * 10) / 10
+      return count.toFixed(1).replace(/\.0$/, "").replace(".", ",") + suffix
+    }
+  }
+  return String(value)
+}
+
+export function generatedTokens(tokens: Tokens): number {
+  return tokens.output + tokens.reasoning
+}
+
+export function tokenTotal(tokens: Tokens): number {
+  return tokens.input + tokens.cacheRead + tokens.cacheWrite + generatedTokens(tokens)
+}
+
+export function formatRate(value: number): string {
+  return `${value.toFixed(1).replace(".", ",")} ток/с`
+}
+
+export function tokensLabel(summary: Summary): string | null {
+  const total = tokenTotal(summary.tokens)
+  if (total === 0) return null
+
+  const parts = [
+    `Токены: ${compactTokens(total)}`,
+    `вход ${compactTokens(summary.tokens.input)}`,
+    `из кэша ${compactTokens(summary.tokens.cacheRead)}`,
+  ]
+  if (summary.tokens.cacheWrite > 0) {
+    parts.push(`запись ${compactTokens(summary.tokens.cacheWrite)}`)
+  }
+  parts.push(`выход ${compactTokens(generatedTokens(summary.tokens))}`)
+  if (summary.seconds > 0) {
+    parts.push(formatRate(generatedTokens(summary.tokens) / summary.seconds))
+  }
+  return parts.join(" · ")
 }
 
 export function label(

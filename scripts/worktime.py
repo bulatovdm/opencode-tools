@@ -104,6 +104,25 @@ def fmt_money(x: float) -> str:
     return f"${x:.4f}"
 
 
+def fmt_tokens(count: float) -> str:
+    """Компактно, с усечением: 999 999 -> 999,9k, а не 1M."""
+    count = int(count)
+    for threshold, suffix in ((1_000_000_000, "B"), (1_000_000, "M"),
+                              (1_000, "k")):
+        if count >= threshold:
+            value = int(count / threshold * 10) / 10
+            text = f"{value:.1f}".rstrip("0").rstrip(".")
+            return text.replace(".", ",") + suffix
+    return str(count)
+
+
+def fmt_rate(tokens: dict, seconds: float) -> str:
+    if seconds <= 0:
+        return "—"
+    rate = tokens["generated"] / seconds
+    return f"{rate:.1f}".replace(".", ",") + " ток/с"
+
+
 def fmt_range(start: date, end: date, first_ever: date | None = None) -> str:
     today = date.today()
     if start == today and end == today:
@@ -275,6 +294,39 @@ def split_by_day(
 
 # ------------------------------------------------------------------ одна сессия
 
+TOKEN_FIELDS = ("input", "cache_read", "cache_write", "output", "reasoning")
+
+
+def empty_tokens() -> dict:
+    tokens = {field: 0 for field in TOKEN_FIELDS}
+    tokens["total"] = 0
+    tokens["generated"] = 0
+    return tokens
+
+
+def session_tokens(conn: sqlite3.Connection, session_ids: list[str]) -> dict:
+    """Токены всех шагов семейства: вход, кэш, выход и рассуждения."""
+    if not session_ids:
+        return empty_tokens()
+    marks = ",".join("?" for _ in session_ids)
+    row = conn.execute(
+        f"""select
+              coalesce(sum(json_extract(data,'$.tokens.input')), 0),
+              coalesce(sum(json_extract(data,'$.tokens.cache.read')), 0),
+              coalesce(sum(json_extract(data,'$.tokens.cache.write')), 0),
+              coalesce(sum(json_extract(data,'$.tokens.output')), 0),
+              coalesce(sum(json_extract(data,'$.tokens.reasoning')), 0)
+            from session_message
+            where type = 'assistant'
+              and session_id in ({marks})""",
+        session_ids,
+    ).fetchone()
+    tokens = dict(zip(TOKEN_FIELDS, (value or 0 for value in row)))
+    tokens["total"] = sum(tokens[field] for field in TOKEN_FIELDS)
+    tokens["generated"] = tokens["output"] + tokens["reasoning"]
+    return tokens
+
+
 def session_work_time(
     conn: sqlite3.Connection,
     session_id: str,
@@ -326,10 +378,12 @@ def session_work_time(
     ).fetchone()[0]
 
     session_members = [sessions[member] for member in members]
+    seconds = merged_seconds(intervals)
+    tokens = session_tokens(conn, members)
     return {
         "session_id": root,
         "title": sessions[root]["title"],
-        "total_seconds": merged_seconds(intervals),
+        "total_seconds": seconds,
         "current_seconds": current,
         "live": bool(ongoing),
         "last_user_at": last_user,
@@ -337,8 +391,10 @@ def session_work_time(
         "tools": tools,
         "subagents": len(members) - 1,
         "cost": sum(s["cost"] or 0 for s in session_members),
-        "tokens_input": sum(s["tokens_input"] or 0 for s in session_members),
-        "tokens_output": sum(s["tokens_output"] or 0 for s in session_members),
+        "tokens": tokens,
+        "tokens_per_second": (
+            tokens["generated"] / seconds if seconds > 0 else None
+        ),
         "sessions": members,
     }
 

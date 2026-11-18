@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import balance as bl  # noqa: E402
 import worktime as wt  # noqa: E402
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 
 
 def print_time(value: dict, label: str = "работа агента") -> None:
@@ -34,6 +34,17 @@ def print_time(value: dict, label: str = "работа агента") -> None:
     if value["subagents"]:
         print(f"  субагентов      {value['subagents']}")
     print(f"  стоимость       {wt.fmt_money(value['cost'])}")
+    tokens = value["tokens"]
+    if tokens["total"]:
+        print(f"  токенов         {wt.fmt_tokens(tokens['total'])}")
+        print(f"    вход          {wt.fmt_tokens(tokens['input'])}")
+        print(f"    из кэша       {wt.fmt_tokens(tokens['cache_read'])}")
+        if tokens["cache_write"]:
+            print(f"    запись кэша   {wt.fmt_tokens(tokens['cache_write'])}")
+        print(f"    выход         {wt.fmt_tokens(tokens['generated'])}")
+        if tokens["reasoning"]:
+            print(f"      рассуждения {wt.fmt_tokens(tokens['reasoning'])}")
+        print(f"  темп            {wt.fmt_rate(tokens, value['total_seconds'])}")
     print()
 
 

@@ -120,7 +120,7 @@ def main() -> int:
     print("  opencode-tools balance         # остаток на балансе")
     print("  opencode-tools watch           # живая строка")
     print()
-    print("Строка «Работа: … · баланс DeepSeek: …» появится в футере "
+    print("Строки «Работа: …» и «Токены: …» появятся в футере "
           "после /reload или перезапуска TUI.")
     return 0
 
