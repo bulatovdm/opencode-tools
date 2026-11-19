@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """opencode-tools — личные инструменты для OpenCode.
 
-Пока одна команда: реальное время работы агента.
+Время и токены сессий, статистика, баланс провайдера и лимиты OpenCode Go.
 """
 from __future__ import annotations
 
@@ -14,9 +14,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import balance as bl  # noqa: E402
+import usage as us  # noqa: E402
 import worktime as wt  # noqa: E402
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 
 def print_time(value: dict, label: str = "работа агента") -> None:
@@ -188,6 +189,18 @@ def cmd_balance(args) -> int:
     return 0
 
 
+def cmd_limits(args) -> int:
+    key = us.read_go_key()
+    if not key:
+        raise us.UsageError("OpenCode Go не подключён: нет ключа opencode-go")
+    value = us.fetch_go(key, args.timeout)
+    if args.json:
+        print(wt.dump(value))
+    else:
+        us.print_limits(value)
+    return 0
+
+
 def cmd_stats(args) -> int:
     conn = wt.connect()
     today = date.today()
@@ -271,6 +284,13 @@ def build_parser() -> argparse.ArgumentParser:
                                 help="таймаут запроса в секундах (по умолчанию 10)")
     balance_parser.add_argument("--json", action="store_true")
     balance_parser.set_defaults(func=cmd_balance)
+
+    limits_parser = sub.add_parser(
+        "limits", help="остаток лимитов OpenCode Go (5ч, неделя, месяц)")
+    limits_parser.add_argument("--timeout", type=float, default=us.DEFAULT_TIMEOUT,
+                               help="таймаут запроса в секундах (по умолчанию 10)")
+    limits_parser.add_argument("--json", action="store_true")
+    limits_parser.set_defaults(func=cmd_limits)
 
     stats_parser = sub.add_parser(
         "stats", help="заходы, промпты, шаги, время и стоимость за период")

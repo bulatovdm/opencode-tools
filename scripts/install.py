@@ -118,9 +118,10 @@ def main() -> int:
     print("  opencode-tools time            # работа последней сессии")
     print("  opencode-tools stats --days 7  # заходы, шаги, время, стоимость")
     print("  opencode-tools balance         # остаток на балансе")
+    print("  opencode-tools limits          # остаток лимитов OpenCode Go")
     print("  opencode-tools watch           # живая строка")
     print()
-    print("Строки «Работа: …» и «Токены: …» появятся в футере "
+    print("Строки «Работа: …», «Go: …» и «Токены: …» появятся в футере "
           "после /reload или перезапуска TUI.")
     return 0
 
