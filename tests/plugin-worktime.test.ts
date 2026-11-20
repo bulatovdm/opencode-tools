@@ -141,8 +141,8 @@ describe("label", () => {
     const summary = {
       seconds: 60, live: false, lastUser: 0, cost: 0.42, tokens: noTokens,
     }
-    expect(label(summary, false, s(1000), "DeepSeek: $10.14"))
-      .toBe("Работа: 1м · потрачено $0.4200 · баланс DeepSeek: $10.14")
+    expect(label(summary, false, s(1000), "$10.14"))
+      .toBe("Работа: 1м · потрачено $0.4200 · баланс $10.14")
   })
 })
 
@@ -162,7 +162,7 @@ describe("tokensLabel", () => {
     expect(tokenTotal(tokens)).toBe(12_307_100)
     expect(generatedTokens(tokens)).toBe(90_400)
     expect(tokensLabel(summary)).toBe(
-      "Токены: 12,3M · вход 116,7k · из кэша 12,1M · выход 90,4k · 9,0 ток/с",
+      "Токены: 12,3M · вход 116,7k · кэш 12,1M · выход 90,4k · 9,0 ток/с",
     )
   })
 
@@ -175,7 +175,7 @@ describe("tokensLabel", () => {
       tokens: { ...tokens, cacheWrite: 2_500 },
     }
     expect(tokensLabel(summary)).toBe(
-      "Токены: 12,3M · вход 116,7k · из кэша 12,1M · запись 2,5k · выход 90,4k",
+      "Токены: 12,3M · вход 116,7k · кэш 12,1M · запись 2,5k · выход 90,4k",
     )
   })
 
@@ -194,6 +194,7 @@ describe("compactTokens", () => {
     expect(compactTokens(1_500)).toBe("1,5k")
     expect(compactTokens(999_999)).toBe("999,9k")
     expect(compactTokens(46_107_776)).toBe("46,1M")
+    expect(compactTokens(337_600_000)).toBe("337M")
     expect(compactTokens(2_000_000_000)).toBe("2B")
   })
 

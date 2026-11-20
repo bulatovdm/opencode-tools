@@ -94,8 +94,11 @@ export default Plugin.define({
     const firstUsage = setTimeout(() => {
       if (usage.data === null) void refreshUsage()
     }, 2000)
-    const balanceTimer = setInterval(() => void refresh(), 5 * 60 * 1000)
+    const balanceTimer = setInterval(() => void refresh(), 60 * 1000)
     const usageTimer = setInterval(() => void refreshUsage(), 5 * 60 * 1000)
+    const stopStarted = context.data.on("session.execution.started", () => {
+      if (usingDeepSeek()) schedule(1000, true)
+    })
     const stopExecuted = context.data.on("session.execution.succeeded", () => {
       if (usingDeepSeek()) schedule(3000)
       if (usingGo()) scheduleUsage(3000)
@@ -125,6 +128,8 @@ export default Plugin.define({
           const summary = collect(messages, clock.now)
           const running = context.data.session.status(sessionID) === "running"
           const provider = context.ui.model.current()?.providerID
+          // Старый кэш хранил подпись с провайдером; новые значения — только сумма.
+          const balanceText = balance.text.replace(/^DeepSeek:\s*/, "")
           const tokens = tokensLabel(summary)
           const limits = provider === "opencode-go" && usage.data
             ? usageLabel(usage.data, clock.now)
@@ -133,7 +138,7 @@ export default Plugin.define({
             <box flexDirection="column">
               <text fg={context.theme.text.base}>
                 {label(summary, running, clock.now,
-                       provider === "deepseek" ? balance.text : "")}
+                       provider === "deepseek" ? balanceText : "")}
               </text>
               {limits ? <text fg={context.theme.text.muted}>{limits}</text> : null}
               {tokens ? <text fg={context.theme.text.muted}>{tokens}</text> : null}
@@ -152,6 +157,7 @@ export default Plugin.define({
       clearInterval(usageTimer)
       if (pending) clearTimeout(pending)
       if (pendingUsage) clearTimeout(pendingUsage)
+      stopStarted()
       stopExecuted()
       stopModel()
       stop()

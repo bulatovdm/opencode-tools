@@ -175,6 +175,7 @@ class WorkTimeTests(Fixture):
         self.assertEqual(wt.fmt_tokens(1000), "1k")
         self.assertEqual(wt.fmt_tokens(1500), "1,5k")
         self.assertEqual(wt.fmt_tokens(46_107_776), "46,1M")
+        self.assertEqual(wt.fmt_tokens(337_600_000), "337M")
         self.assertEqual(wt.fmt_tokens(2_000_000_000), "2B")
         self.assertEqual(wt.fmt_rate({"generated": 65}, 10), "6,5 ток/с")
         self.assertEqual(wt.fmt_rate({"generated": 0}, 0), "—")

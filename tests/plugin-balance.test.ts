@@ -127,7 +127,7 @@ describe("formatting", () => {
   })
 
   test("snapshot label", () => {
-    expect(snapshotLabel(parseDeepSeek(DEEPSEEK))).toBe("DeepSeek: $10.14")
+    expect(snapshotLabel(parseDeepSeek(DEEPSEEK))).toBe("$10.14")
     expect(snapshotLabel({ available: false, balances: [] })).toBeNull()
   })
 
@@ -135,7 +135,7 @@ describe("formatting", () => {
     const path = await tempAuth(JSON.stringify({ deepseek: { type: "api", key: "sk-6" } }))
     const fake: FetchLike = async () => new Response(JSON.stringify(DEEPSEEK), { status: 200 })
     try {
-      expect(await deepseekBalanceLabel(path, fake)).toBe("DeepSeek: $10.14")
+      expect(await deepseekBalanceLabel(path, fake)).toBe("$10.14")
     } finally {
       await rm(path, { force: true })
     }

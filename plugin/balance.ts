@@ -124,7 +124,7 @@ export function snapshotLabel(snapshot: BalanceSnapshot): string | null {
   const amount = snapshot.balances
     .map((item) => formatAmount(item.total, item.currency))
     .join(" · ")
-  return snapshot.available ? `DeepSeek: ${amount}` : `DeepSeek: ${amount} (недоступен)`
+  return snapshot.available ? amount : `${amount} (недоступен)`
 }
 
 export async function deepseekBalanceLabel(

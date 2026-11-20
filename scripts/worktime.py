@@ -110,8 +110,15 @@ def fmt_tokens(count: float) -> str:
     for threshold, suffix in ((1_000_000_000, "B"), (1_000_000, "M"),
                               (1_000, "k")):
         if count >= threshold:
-            value = int(count / threshold * 10) / 10
-            text = f"{value:.1f}".rstrip("0").rstrip(".")
+            scaled = count / threshold
+            # Для больших миллионов/миллиардов десятая доля только удлиняет
+            # строку; километровые значения оставляем с одним знаком.
+            digits = 0 if threshold >= 1_000_000 and scaled >= 100 else 1
+            factor = 10 ** digits
+            value = int(scaled * factor) / factor
+            text = f"{value:.{digits}f}"
+            if digits:
+                text = text.rstrip("0").rstrip(".")
             return text.replace(".", ",") + suffix
     return str(count)
 

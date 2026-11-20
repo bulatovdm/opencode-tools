@@ -137,8 +137,14 @@ export function compactTokens(value: number): string {
     [1_000, "k"],
   ] as const) {
     if (value >= threshold) {
-      const count = Math.floor((value / threshold) * 10) / 10
-      return count.toFixed(1).replace(/\.0$/, "").replace(".", ",") + suffix
+      const scaled = value / threshold
+      // Для больших миллионов/миллиардов десятая доля не нужна и только
+      // удлиняет строку; километровые значения оставляем с одним знаком.
+      const digits = threshold >= 1_000_000 && scaled >= 100 ? 0 : 1
+      const factor = 10 ** digits
+      const count = Math.floor(scaled * factor) / factor
+      const text = count.toFixed(digits).replace(/\.0$/, "")
+      return text.replace(".", ",") + suffix
     }
   }
   return String(value)
@@ -163,7 +169,7 @@ export function tokensLabel(summary: Summary): string | null {
   const parts = [
     `Токены: ${compactTokens(total)}`,
     `вход ${compactTokens(summary.tokens.input)}`,
-    `из кэша ${compactTokens(summary.tokens.cacheRead)}`,
+    `кэш ${compactTokens(summary.tokens.cacheRead)}`,
   ]
   if (summary.tokens.cacheWrite > 0) {
     parts.push(`запись ${compactTokens(summary.tokens.cacheWrite)}`)
