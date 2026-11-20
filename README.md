@@ -6,7 +6,8 @@ OpenCode Go.
 
 Время и стоимость берутся из локальной базы OpenCode
 (`~/.local/share/opencode/opencode.db`). Наружу ходят только `balance`,
-`limits` и соответствующие строки в футере: это запросы к API провайдера.
+`limits`, строки футера и уведомления на телефон: это запросы к API
+провайдера и к выбранному сервису пушей.
 
 ## Установка
 
@@ -17,9 +18,10 @@ OpenCode Go.
 ```
 
 Скрипт прогоняет тесты и делает ссылку `~/.local/bin/opencode-tools`.
-Заодно подключает TUI-плагин в `~/.config/opencode/cli.json`: после
-`/reload` (или перезапуска TUI) в футере появляются строки `Работа: …`,
-`Go: …` (только для провайдера `opencode-go`) и `Токены: …`. Удалить всё:
+Заодно подключает TUI-плагин в `~/.config/opencode/cli.json` и серверный
+плагин уведомлений в `~/.config/opencode/opencode.json`: после `/reload`
+(или перезапуска TUI) в футере появляются строки `Работа: …`, `Go: …`
+(только для провайдера `opencode-go`) и `Токены: …`. Удалить всё:
 `./install.sh --uninstall`.
 
 ## Постоянная строка в TUI
@@ -51,9 +53,66 @@ Go: осталось 5ч 77% (4ч 44м) · нед 91% (3д) · мес 96% (29д)
 удалось, последняя часть просто не показывается. Токены считаются локально
 и в сеть не ходят.
 
-Плагин лежит в `plugin/`, в `cli.json` добавляется путь к этой папке.
+Плагин TUI лежит в `plugin/`, в `cli.json` добавляется путь к этой папке.
+Серверный плагин уведомлений лежит в `notify/` и подключается в
+`opencode.json`.
 
 Если строки нет — выполните `/reload` или перезапустите OpenCode.
+
+
+## Уведомления на телефон
+
+Серверный плагин `notify/` присылает пуш в ntfy (и/или Telegram), когда
+агенту нужен человек:
+
+- `🔐 Needs permission: shell` — запрос разрешения, сразу (или через
+  `INPUT_NOTIFY_SECONDS`);
+- `❓ OpenCode asks you a question` — вопрос агента (`question`), так же;
+- `💬 Waiting for your reply` — через 30 секунд после конца хода, один раз
+  на ход; новый ход или отправленный промпт отменяют пуш;
+- `💬 Waiting for your reply (a background task is still running)` — если
+  фоновая команда или субагент всё ещё работают через
+  `BACKGROUND_WAIT_LIMIT_SECONDS`;
+- `⚠️ OpenCode stopped with an error` — ход завершился ошибкой.
+
+Заголовок: `OpenCode · <репозиторий> · <название сессии> [<короткий ID>]`.
+Для worktree — `<репозиторий> (<worktree>)`. Тексты промптов, команды, пути
+и содержимое файлов не отправляются: в теле только тип события (и действие
+разрешения), имя проекта и название сессии.
+
+Настройки — общий с Claude Code и codex-tools файл `notify.env`. Порядок:
+`OPENCODE_NOTIFY_CONFIG` → `~/.config/opencode/notify.env` →
+`$CODEX_HOME/notify.env` (обычно `~/.codex/notify.env`) →
+`~/.claude/notify.env`. Если есть конфиг Codex или Claude, отдельный топик
+не нужен: плагин берёт его. Если ни одного файла нет, `install.sh` создаёт
+`~/.config/opencode/notify.env` с правами 0600 и случайным топиком.
+
+```sh
+NTFY_TOPIC=...
+# NTFY_SERVER=https://ntfy.sh
+# IDLE_NOTIFY_SECONDS=30
+# INPUT_NOTIFY_SECONDS=0
+# BACKGROUND_WAIT_LIMIT_SECONDS=900
+# TELEGRAM_BOT_TOKEN=...
+# TELEGRAM_CHAT_ID=...
+```
+
+`NTFY_TOPIC` — топик в приложении ntfy. Кто знает имя топика, тот может
+читать его, поэтому топик — секрет. `INPUT_NOTIFY_SECONDS=0` — разрешения и
+вопросы приходят сразу; поставьте 30, чтобы не дёргать, если вы у
+компьютера. `BACKGROUND_WAIT_LIMIT_SECONDS` ограничивает ожидание фоновой
+задачи. Telegram можно использовать вместе с ntfy или вместо него.
+
+Плагин живёт в серверной части OpenCode, поэтому TUI для отправки не нужен.
+Он подписан на `permission.asked`, `form.created` и `session.execution.*`.
+Серверный поток событий в OpenCode 2.1.4 не присылает `session.idle`,
+поэтому конец хода определяется по `session.execution.succeeded`.
+
+Проверить после установки: создайте новый ход и не отвечайте 30 секунд —
+должен прийти `💬 Waiting for your reply`. Топик и каналы перечитываются
+перед каждой отправкой, а паузы (`IDLE_NOTIFY_SECONDS`,
+`INPUT_NOTIFY_SECONDS`, `BACKGROUND_WAIT_LIMIT_SECONDS`) — при загрузке
+плагина: после их правки выполните `/reload` или перезапустите OpenCode.
 
 
 ## Баланс провайдера
